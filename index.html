@@ -3,13 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arifa admin Dashboard</title>
+    <title>Arifa Admin Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root { --dark: #0f172a; --sidebar: #1e293b; --accent: #3b82f6; --bg: #f1f5f9; }
         * { margin:0; padding:0; box-sizing: border-box; font-family: 'Poppins', sans-serif; }
         body { background: var(--bg); display: flex; min-height: 100vh; }
+
+        /* Login Overlay */
+        #login-overlay {
+            position: fixed; inset: 0; background: var(--dark);
+            display: flex; align-items: center; justify-content: center; z-index: 5000;
+        }
+        .login-box { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; }
 
         /* Sidebar */
         aside { 
@@ -45,7 +52,7 @@
         .modal { position: fixed; inset:0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
         .modal-content { background: white; padding: 25px; border-radius: 12px; width: 400px; }
         input, select, textarea { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; }
-        .btn { padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer; background: var(--accent); color: white; }
+        .btn { padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer; background: var(--accent); color: white; width: 100%; }
 
         @media (max-width: 768px) {
             aside { width: 100%; height: auto; position: relative; display: flex; padding: 10px; }
@@ -57,14 +64,26 @@
 </head>
 <body>
 
-    <aside>
-        <h2>Arifa Admin Panel</h2>
+    <div id="login-overlay" style="display: none;">
+        <div class="login-box">
+            <h2 style="margin-bottom: 20px;">Admin Login</h2>
+            <form id="admin-login-form">
+                <input type="email" id="admin-email" placeholder="Email" required>
+                <input type="password" id="admin-pass" placeholder="Password" required>
+                <button type="submit" class="btn">Login to Admin</button>
+            </form>
+            <p style="margin-top: 15px;"><a href="user.html" style="color: var(--accent); text-decoration: none;">Back to Store</a></p>
+        </div>
+    </div>
+
+    <aside id="sidebar-nav">
+        <h2>Arifa Admin</h2>
         <a href="#dashboard" class="side-link active"><i class="fas fa-chart-line"></i> <span>Dashboard</span></a>
         <a href="#products" class="side-link"><i class="fas fa-box"></i> <span>Products</span></a>
         <a href="#orders" class="side-link"><i class="fas fa-shopping-bag"></i> <span>Orders</span></a>
         <a href="#slider" class="side-link"><i class="fas fa-images"></i> <span>Slider</span></a>
         <a href="#messages" class="side-link"><i class="fas fa-envelope"></i> <span>Messages</span></a>
-        <a href="#" onclick="logout()" class="side-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
+        <a href="#" id="logout-btn" class="side-link"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
     </aside>
 
     <main>
@@ -81,7 +100,7 @@
         <section id="products">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <h1>Products</h1>
-                <button class="btn" onclick="openProductModal()">+ Add Product</button>
+                <button class="btn" style="width: auto;" onclick="openProductModal()">+ Add Product</button>
             </div>
             <div class="table-container">
                 <table id="products-table">
@@ -104,7 +123,7 @@
         <section id="slider">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <h1>Slider Management</h1>
-                <button class="btn" onclick="openSliderModal()">+ Add Slide</button>
+                <button class="btn" style="width: auto;" onclick="openSliderModal()">+ Add Slide</button>
             </div>
             <div class="table-container">
                 <table id="slider-table">
@@ -136,7 +155,7 @@
                 <input type="text" id="p-img" placeholder="Image URL" required>
                 <textarea id="p-desc" placeholder="Description"></textarea>
                 <button type="submit" class="btn">Save Product</button>
-                <button type="button" class="btn" style="background:#64748b" onclick="closeModals()">Cancel</button>
+                <button type="button" class="btn" style="background:#64748b; margin-top: 10px;" onclick="closeModals()">Cancel</button>
             </form>
         </div>
     </div>
@@ -147,83 +166,75 @@
             <form id="slide-form">
                 <input type="text" id="s-url" placeholder="Image URL" required>
                 <button type="submit" class="btn">Add Image</button>
-                <button type="button" class="btn" style="background:#64748b" onclick="closeModals()">Cancel</button>
+                <button type="button" class="btn" style="background:#64748b; margin-top: 10px;" onclick="closeModals()">Cancel</button>
             </form>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
         import { getDatabase, ref, set, get, push, onValue, update, remove } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 
         const firebaseConfig = {
-  apiKey: "AIzaSyDbc54ZsWBXFqX50KvY85kbHkUo_Ct5hLk",
-  authDomain: "arifa-shop.firebaseapp.com",
-  databaseURL: "https://arifa-shop-default-rtdb.firebaseio.com",
-  projectId: "arifa-shop",
-  storageBucket: "arifa-shop.firebasestorage.app",
-  messagingSenderId: "792267788402",
-  appId: "1:792267788402:web:96dd32886699ff188472eb"
-};
+            apiKey: "AIzaSyDbc54ZsWBXFqX50KvY85kbHkUo_Ct5hLk",
+            authDomain: "arifa-shop.firebaseapp.com",
+            databaseURL: "https://arifa-shop-default-rtdb.firebaseio.com",
+            projectId: "arifa-shop",
+            storageBucket: "arifa-shop.firebasestorage.app",
+            messagingSenderId: "792267788402",
+            appId: "1:792267788402:web:96dd32886699ff188472eb"
+        };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getDatabase(app);
 
-        // --- Security Check ---
+        // --- Auth Logic ---
         onAuthStateChanged(auth, user => {
-            if(!user) {
-                // In a real app, redirect to a login page or user.html
-                alert("Please login via the Storefront first.");
-                window.location.href = 'user.html';
+            if (user) {
+                document.getElementById('login-overlay').style.display = 'none';
+                initDashboard();
+            } else {
+                document.getElementById('login-overlay').style.display = 'flex';
             }
         });
+
+        document.getElementById('admin-login-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('admin-email').value;
+            const pass = document.getElementById('admin-pass').value;
+            try {
+                await signInWithEmailAndPassword(auth, email, pass);
+            } catch (err) {
+                alert("Login Error: " + err.message);
+            }
+        };
+
+        document.getElementById('logout-btn').onclick = () => signOut(auth);
+
+        // --- Functions ---
+        function initDashboard() {
+            updateStats();
+            renderProducts();
+            renderOrders();
+            renderSlider();
+            renderMessages();
+        }
 
         // --- Router ---
         window.onhashchange = () => {
             const hash = location.hash || '#dashboard';
             document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
-            document.getElementById(hash.substring(1))?.classList.add('active');
+            const target = document.getElementById(hash.substring(1));
+            if(target) target.classList.add('active');
             document.querySelectorAll('.side-link').forEach(l => l.classList.toggle('active', l.getAttribute('href') === hash));
         };
 
-        // --- Dashboard Stats ---
-        const updateStats = () => {
-            onValue(ref(db, 'products'), s => document.getElementById('count-p').innerText = s.exists() ? Object.keys(s.val()).length : 0);
-            onValue(ref(db, 'orders'), s => {
-                let count = 0;
-                if(s.exists()) Object.values(s.val()).forEach(userOrders => count += Object.keys(userOrders).length);
-                document.getElementById('count-o').innerText = count;
-            });
-            onValue(ref(db, 'users'), s => document.getElementById('count-u').innerText = s.exists() ? Object.keys(s.val()).length : 0);
-            onValue(ref(db, 'messages'), s => document.getElementById('count-m').innerText = s.exists() ? Object.keys(s.val()).length : 0);
-        };
-
-        // --- Product Management ---
-        const renderProducts = () => {
-            onValue(ref(db, 'products'), snap => {
-                const tbody = document.querySelector('#products-table tbody');
-                tbody.innerHTML = '';
-                if(snap.exists()){
-                    Object.entries(snap.val()).forEach(([id, p]) => {
-                        tbody.innerHTML += `
-                            <tr>
-                                <td><img src="${p.imageUrl}" class="thumb"></td>
-                                <td>${p.name}</td>
-                                <td>${p.category}</td>
-                                <td>$${p.price}</td>
-                                <td>
-                                    <i class="fas fa-edit" onclick="editProduct('${id}')" style="cursor:pointer; color:blue"></i>
-                                    <i class="fas fa-trash" onclick="deleteItem('products/${id}')" style="cursor:pointer; color:red; margin-left:10px"></i>
-                                </td>
-                            </tr>
-                        `;
-                    });
-                }
-            });
-        };
-
+        // ... [Include the rest of your original Product, Order, Slider rendering functions here] ...
+        // (বাকি ফাংশনগুলো আগের মতোই কাজ করবে)
+        
+        // Example for window functions to work globally
         window.openProductModal = (id = null) => {
             document.getElementById('prod-form').reset();
             document.getElementById('p-id').value = id || '';
@@ -256,7 +267,40 @@
             closeModals();
         };
 
-        // --- Order Management ---
+        const renderProducts = () => {
+            onValue(ref(db, 'products'), snap => {
+                const tbody = document.querySelector('#products-table tbody');
+                tbody.innerHTML = '';
+                if(snap.exists()){
+                    Object.entries(snap.val()).forEach(([id, p]) => {
+                        tbody.innerHTML += `
+                            <tr>
+                                <td><img src="${p.imageUrl}" class="thumb"></td>
+                                <td>${p.name}</td>
+                                <td>${p.category}</td>
+                                <td>$${p.price}</td>
+                                <td>
+                                    <i class="fas fa-edit" onclick="editProduct('${id}')" style="cursor:pointer; color:blue"></i>
+                                    <i class="fas fa-trash" onclick="deleteItem('products/${id}')" style="cursor:pointer; color:red; margin-left:10px"></i>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                }
+            });
+        };
+
+        const updateStats = () => {
+            onValue(ref(db, 'products'), s => document.getElementById('count-p').innerText = s.exists() ? Object.keys(s.val()).length : 0);
+            onValue(ref(db, 'orders'), s => {
+                let count = 0;
+                if(s.exists()) Object.values(s.val()).forEach(userOrders => count += Object.keys(userOrders).length);
+                document.getElementById('count-o').innerText = count;
+            });
+            onValue(ref(db, 'users'), s => document.getElementById('count-u').innerText = s.exists() ? Object.keys(s.val()).length : 0);
+            onValue(ref(db, 'messages'), s => document.getElementById('count-m').innerText = s.exists() ? Object.keys(s.val()).length : 0);
+        };
+
         const renderOrders = () => {
             onValue(ref(db, 'orders'), snap => {
                 const tbody = document.querySelector('#orders-table tbody');
@@ -287,7 +331,6 @@
 
         window.updateOrderStatus = (uid, oid, val) => update(ref(db, `orders/${uid}/${oid}`), { status: val });
 
-        // --- Slider Management ---
         const renderSlider = () => {
             onValue(ref(db, 'sliderImages'), snap => {
                 const tbody = document.querySelector('#slider-table tbody');
@@ -313,7 +356,6 @@
             closeModals();
         };
 
-        // --- Messages ---
         const renderMessages = () => {
             onValue(ref(db, 'messages'), snap => {
                 const tbody = document.querySelector('#messages-table tbody');
@@ -326,18 +368,11 @@
             });
         };
 
-        // --- Global Helpers ---
         window.deleteItem = (path) => { if(confirm('Are you sure?')) remove(ref(db, path)); };
         window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
-        window.logout = () => signOut(auth).then(() => window.location.href = 'user.html');
         window.editProduct = (id) => openProductModal(id);
-
-        // Init
-        updateStats();
-        renderProducts();
-        renderOrders();
-        renderSlider();
-        renderMessages();
+        
     </script>
 </body>
 </html>
+
